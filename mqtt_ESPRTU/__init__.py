@@ -59,95 +59,28 @@ CONFIG_SCHEMA = vol.Schema(
 
 
 #def setSensor(hass, sens_name, friendly_name, value)
-def setSensor(hass, dev_type, dev_name, tag_name, value, friendly_name, tag_type):
-    sens_name = str(dev_type) + "_" + str(dev_name) + "." + str(tag_name)
+def setSensor(hass_instance,sens_name,friendly_name,value,is_measurement,device_class,unit_of_measurement,icon):
+    if (hass_instance is None) or (sens_name is None):
+        return;
+    if value is None:
+        value = "No data"
 
-    if tag_type == "Battery":
-        hass.states.set(
-            sens_name, value,
-            {
-                'state_class': 'measurement',
-                'unit_of_measurement': 'V',
-                'device_class': 'voltage',
-                'friendly_name': friendly_name,
-                'icon': 'mdi:battery-outline',
-            })
-        return
-    elif tag_type == "Measurement_no":
-        hass.states.set(
-            sens_name, value,
-            {
-                'state_class': 'measurement',
-                'unit_of_measurement': 'V',
-                'device_class': 'voltage',
-                'friendly_name': friendly_name,
-                'icon': 'mdi:solar-power',
-            })
-        return
-    elif tag_type == "Solar":
-        hass.states.set(
-            sens_name, value,
-            {
-                'state_class': 'measurement',
-                'unit_of_measurement': 'V',
-                'device_class': 'voltage',
-                'friendly_name': friendly_name,
-                'icon': 'mdi:solar-power',
-            })
-        return
-    elif tag_type == "Com":
-        hass.states.set(
-            sens_name, value,
-            {
-                #'state_class': 'measurement',
-                #'unit_of_measurement': '',
-                #'device_class': 'temperature',
-                'friendly_name': friendly_name,
-                'icon': 'mdi:satellite-uplink',
-            })
-        return
-    elif tag_type == "GPS":
-        hass.states.set(
-            sens_name, value,
-            {
-                #'state_class': 'measurement',
-                #'unit_of_measurement': '',
-                #'device_class': 'temperature',
-                'friendly_name': friendly_name,
-                'icon': 'mdi:archive-marker',
-            })
-        return
-    elif tag_type == "Temp":    # temperature entity
-        hass.states.set(
-            sens_name, value,
-            {
-                'state_class': 'measurement',
-                'unit_of_measurement': '°C',
-                'device_class': 'temperature',
-                'friendly_name': friendly_name,
-                'icon': 'mdi:thermometer',
-            })
-        return
-    elif tag_type == "Msg_id":    # temperature entity
-        hass.states.set(
-            sens_name, value,
-            {
-                #'state_class': 'measurement',
-                #'unit_of_measurement': '°C',
-                #'device_class': 'temperature',
-                'friendly_name': friendly_name,
-                'icon': 'mdi:counter',
-            })
-        return
-    hass.states.set(
-            sens_name, value,
-            {
-                'state_class': 'measurement',
-                'unit_of_measurement': '°C',
-                'device_class': 'temperature',
-                'friendly_name': friendly_name,
-                'icon': 'mdi:thermometer',
-            })
+    if icon is None:
+        icon = 'mdi:battery-outline'
+
+    attributes= {
+        'icon': icon,
+    }
+    attributes['friendly_name']= friendly_name
+    if is_measurement:
+        attributes['state_class']='measurement'
+    if unit_of_measurement is not None:
+        attributes['unit_of_measurement']= unit_of_measurement
+    if device_class is not None:
+        attributes['device_class']= device_class
+
+    hass_instance.states.set( sens_name, value, attributes )
+
 def update_mqttGPS_location(hass, latitude, longitude):
     hass.states.set(
             'zone.RTU0', 0,
@@ -168,15 +101,18 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
    # entity_id = 'mqtt_ESPRTU.last_message' # TODO: config this from .yaml
     entity_id = 'testsens.test_tag' # TODO: config this from .yaml
 
-    
     plaussible_tags = [ 
-        ("msg_id", "Msg_id", "Mqtt msg ID"),
-        ("v_bat", "Battery", "Battery voltage"),
-        ("v_solar", "Solar", "Solar voltage"),
-        ("con_type", "Com", "Connection type"),
-        ("latitude", "GPS", "Sens. latitude"),
-        ("longitude", "GPS", "Sens. longitude"),
-        ("gps_accuracy", "GPS", "GPS accuracy")
+        ("msg_id",      "Mqtt msg ID",      False,  None,       None,   'mdi:counter'),
+        ("v_bat",       "Battery voltage",  True,   "voltage",  "V",    'mdi:battery-outline'),
+        ("v_solar",     "Solar voltage",    True,   "voltage",  "V",    'mdi:solar-power'),
+        ("con_type",    "Connection type",  False,  None,       None,   'mdi:satellite-uplink'),
+        ("latitude",    "Sens. latitude",   False,  None,       None,   'mdi:archive-marker'),
+        ("longitude",   "Sens. longitude",  False,  None,       None,   'mdi:archive-marker'),
+        ("gps_accuracy","GPS accuracy",     False,  None,       "m",    'mdi:archive-marker'),
+        ("masl", "Metres above sea level",  False,  None,       "m",    'mdi:archive-marker'),
+        ("sat_no", "Satelites visible",     False,  None,       None,   'mdi:satellite-variant'),
+        ("cn0", "GNSS signal strength",     False,  None,       "dBHz", 'mdi:satellite-variant'),
+        ("rssi", "GSM signal strength",     False,  None,       "dBm",  'mdi:satellite-uplink')
          ]
     # Listen to a message on MQTT.
     def message_received(topic: str, payload: str, qos: int) -> None:
@@ -185,19 +121,19 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
         for tag in plaussible_tags:
             if tag[0] in mqttData:
-                setSensor(hass,"HUB","RTU0",tag[0], mqttData[tag[0]], tag[2], tag[1])
+                setSensor(
+                    hass_instance = hass,
+                    sens_name = ("HUB_RTU0." + str(tag[0])),
+                    friendly_name = tag[1],
+                    value = mqttData[tag[0]],
+                    is_measurement = tag[2],
+                    device_class = tag[3],
+                    unit_of_measurement = tag[4],
+                    icon = str(tag[5])
+                )
+                #setSensor(hass,"HUB","RTU0",tag[0], mqttData[tag[0]], tag[2], tag[1])
 
                 #setSensor(hass, "HUB_RTU0." + str(tag[0]), mqttData[tag[0]], )
-                #setSensor(
-                #    hass_instance = hass,
-                #    sens_name = ("HUB_RTU0." + str(tag[0])),
-                #    friendly_name = "hello",
-                #    value = mqttData[tag[0]],
-                #    is_measurement = True,
-                #    device_class = 'temperature',
-                #    unit_of_measurement = '°C',
-                #    icon = 'mdi:archive'
-                #)
 
         if ("latitude" in mqttData) and ("longitude" in mqttData):
             update_mqttGPS_location(hass, mqttData['latitude'], mqttData['longitude'])
@@ -212,16 +148,19 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.states.set(entity_id, 'No messages')
 
     for tag in plaussible_tags:
-        setSensor(hass,"HUB","RTU0",tag[0], "No data", tag[2], tag[1])
+        #setSensor(hass,"HUB","RTU0",tag[0], "No data", tag[2], tag[1])
+        setSensor(
+                    hass_instance = hass,
+                    sens_name = ("HUB_RTU0." + str(tag[0])),
+                    friendly_name = str(tag[1]),
+                    value = "No data",
+                    is_measurement = tag[2],
+                    device_class = str(tag[3]),
+                    unit_of_measurement = str(tag[4]),
+                    icon = str(tag[5])
+                )
 
-    #setSensor(hass,"HUB","RTU0","T0", 21, "Sens T0", "Temp")
-    #setSensor(hass,"HUB","RTU0","T1", 21, "Sens T1", "Temp")
-    #setSensor(hass,"HUB","RTU0","T2", 21, "Sens T2", "Temp")
-    #setSensor(hass,"HUB","RTU0","T3", 21, "Sens T3", "Temp")
-    #setSensor(hass,"HUB","RTU0","T4", 21, "Sens T4", "Temp")
-
-   # hass.states.set(CONF_NAME, 'No messages')
-    #hass.states.set('mqtt_ESPRTU.number', 10)
+   
 
     # temperature sensor
     #'''hass.states.set(
