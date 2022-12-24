@@ -58,6 +58,7 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
+#def setSensor(hass, sens_name, friendly_name, value)
 def setSensor(hass, dev_type, dev_name, tag_name, value, friendly_name, tag_type):
     sens_name = str(dev_type) + "_" + str(dev_name) + "." + str(tag_name)
 
@@ -70,6 +71,17 @@ def setSensor(hass, dev_type, dev_name, tag_name, value, friendly_name, tag_type
                 'device_class': 'voltage',
                 'friendly_name': friendly_name,
                 'icon': 'mdi:battery-outline',
+            })
+        return
+    elif tag_type == "Measurement_no":
+        hass.states.set(
+            sens_name, value,
+            {
+                'state_class': 'measurement',
+                'unit_of_measurement': 'V',
+                'device_class': 'voltage',
+                'friendly_name': friendly_name,
+                'icon': 'mdi:solar-power',
             })
         return
     elif tag_type == "Solar":
@@ -158,10 +170,10 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     
     plaussible_tags = [ 
-        ("MSG_ID", "Msg_id", "Mqtt msg ID"),
-        ("BAT_V", "Battery", "Battery voltage"),
-        ("SOLAR_V", "Solar", "Solar voltage"),
-        ("COM_LINK", "Com", "Connection type"),
+        ("msg_id", "Msg_id", "Mqtt msg ID"),
+        ("v_bat", "Battery", "Battery voltage"),
+        ("v_solar", "Solar", "Solar voltage"),
+        ("con_type", "Com", "Connection type"),
         ("latitude", "GPS", "Sens. latitude"),
         ("longitude", "GPS", "Sens. longitude"),
         ("gps_accuracy", "GPS", "GPS accuracy")
@@ -174,6 +186,18 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
         for tag in plaussible_tags:
             if tag[0] in mqttData:
                 setSensor(hass,"HUB","RTU0",tag[0], mqttData[tag[0]], tag[2], tag[1])
+
+                #setSensor(hass, "HUB_RTU0." + str(tag[0]), mqttData[tag[0]], )
+                #setSensor(
+                #    hass_instance = hass,
+                #    sens_name = ("HUB_RTU0." + str(tag[0])),
+                #    friendly_name = "hello",
+                #    value = mqttData[tag[0]],
+                #    is_measurement = True,
+                #    device_class = 'temperature',
+                #    unit_of_measurement = '°C',
+                #    icon = 'mdi:archive'
+                #)
 
         if ("latitude" in mqttData) and ("longitude" in mqttData):
             update_mqttGPS_location(hass, mqttData['latitude'], mqttData['longitude'])
